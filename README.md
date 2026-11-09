@@ -32,14 +32,10 @@ optional stdout-redirect block the stock file ships commented out, needed becaus
 and server are separate hosts here). All six tasks' content and flags were verified by
 actually compiling and running this pair; see the QA notes in `INSTRUCTOR_NOTES.md`.
 
-**Not included:** `attack-code/exploit.py`, `attack-code/build_string.py`, and their shellcode,
-from `Labsetup.zip`. Task 4 describes what the exploit needs to do and points at the handout's
-relevant sections, but doesn't ship a working payload. See `INSTRUCTOR_NOTES.md`.
-
 **Important runtime detail:** the server sends its output back on a *second* TCP connection
 (port 9091), not on the same socket you send input through — `training.json`'s Introduction
 level explains this, but you'll want to know it before testing the sandbox yourself too.
-
+ 
 ## Why every sandbox is different
 
 APG (Automatic Problem Generation) — see `variables.yml`. Each sandbox gets its own `buf_size`

@@ -1,0 +1,45 @@
+name: format-string-foothold
+
+hosts:
+  - name: attacker
+    base_box:
+      image: kali
+      mgmt_user: debian
+    flavor: standard.small
+
+  - name: server
+    base_box:
+      image: debian-12-x86_64
+      mgmt_user: debian
+    flavor: standard.small
+
+routers:
+  - name: router
+    base_box:
+      image: debian-12-x86_64
+      mgmt_user: debian
+    flavor: standard.small
+
+wan:
+  name: internet-connection
+  cidr: 100.100.100.0/24
+
+networks:
+  - name: lab-switch
+    cidr: 10.1.26.0/24
+
+net_mappings:
+  - host: attacker
+    network: lab-switch
+    ip: 10.1.26.10
+
+  - host: server
+    network: lab-switch
+    ip: 10.1.26.20
+
+router_mappings:
+  - router: router
+    network: lab-switch
+    ip: 10.1.26.1
+
+groups: []

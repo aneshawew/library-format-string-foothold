@@ -1,0 +1,257 @@
+{
+  "title": "Format String Foothold",
+  "description": "A remote format-string exploitation exercise, following all six tasks of SEED Labs' Format String Attack Lab against the lab's own format.c/server.c.",
+  "prerequisites": [
+    "Comfortable with the Linux command line and basic C (pointers, the stack)."
+  ],
+  "outcomes": [
+    "Identify, leak through, write through, and exploit a format-string vulnerability, understand the 64-bit zero-byte-address constraint, and fix the underlying bug."
+  ],
+  "state": "UNRELEASED",
+  "show_stepper_bar": true,
+  "levels": [
+    {
+      "title": "Introduction",
+      "level_type": "INFO_LEVEL",
+      "order": 0,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "content": "# General information\n\n* This game is for educational purposes only.\n* The solution of a level is required for later levels.\n\n# Storyline\n\nA remote server has a format-string vulnerability in how it handles user input (`printf(msg)` instead of `printf(\"%s\", msg)`). Your job: crash it, read its memory, write to its memory, inject code into it, and finally help fix it.\n\nThis follows all six tasks of SEED Labs' *Format String Attack Lab* (W. Du) — see ATTRIBUTION.txt.\n\n# Before you start\n\nThe server sends its output back to you on a **second** connection, not on the same one you used to send your request: before connecting to `10.1.26.20:9090`, start a listener on your own machine's port **9091** (e.g. `nc -lvp 9091`), in a separate terminal, to receive it. Every level from here on assumes you're doing this."
+    },
+    {
+      "title": "Get Access",
+      "level_type": "ACCESS_LEVEL",
+      "order": 1,
+      "estimated_duration": 0,
+      "minimal_possible_solve_time": null,
+      "passkey": "start",
+      "cloud_content": "Access the sandbox, then submit **`start`**.\n\n### Sandbox access\n1. In the topology overview, right-click **`attacker`** and click **`Open GUI`**.\n2. Login with username **`user`** and password **`Password123`**.\n\nSee [documentation](https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access) for SSH access.",
+      "local_content": "This sandbox has not been tested for use with local sandbox."
+    },
+    {
+      "title": "Recon",
+      "level_type": "TRAINING_LEVEL",
+      "order": 2,
+      "estimated_duration": 5,
+      "minimal_possible_solve_time": null,
+      "answer": "9090",
+      "answer_variable_name": null,
+      "content": "Scan `server` (10.1.26.20) and find the one listening TCP service.\n\nThe flag is the port number.",
+      "solution": "`nmap -p- 10.1.26.20`",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Which tool?",
+          "content": "nmap.",
+          "hint_penalty": 2,
+          "order": 0
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 5,
+      "variant_answers": false,
+      "reference_solution": [
+        {
+          "state_name": "port_found",
+          "prereq_state": [],
+          "cmd": "nmap -p- 10.1.26.20",
+          "cmd_type": "bash-command",
+          "cmd_regex": "nmap .*10.1.26.20.*",
+          "optional": false
+        }
+      ],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 1: Crashing the Program",
+      "level_type": "TRAINING_LEVEL",
+      "order": 3,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": null,
+      "answer": "(^_^)(^_^)  Returned properly (^_^)(^_^)",
+      "answer_variable_name": null,
+      "content": "With a listener on 9091 running, send a benign line (e.g. `hello`) to `10.1.26.20:9090` and note the final line you receive back on 9091.\n\nThen send input containing several `%s` format specifiers instead, and compare: the program's stdout is fully buffered when it's writing to a socket rather than a terminal, so when it crashes before exiting normally, none of that buffered output (including the final line) ever gets flushed — you'll likely get nothing back on 9091 at all, which is itself the confirmation.\n\nThe flag is the exact final line that appears after a benign request but never after a crashing one.",
+      "solution": "```\n$ printf 'hello' | nc 10.1.26.20 9090      # on 9091: ... (^_^)(^_^)  Returned properly (^_^)(^_^)\n$ printf '%s%s%s%s%s%s%s%s%s%s%s%s' | nc 10.1.26.20 9090   # on 9091: nothing at all\n```\nEach %s tells printf to dereference the next stack value as a pointer; most aren't valid, and the process segfaults before main() can print its final line — or anything else still sitting in the unflushed stdout buffer.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Why does this crash?",
+          "content": "Each %s tells printf to dereference the next stack value as a pointer; most aren't valid.",
+          "hint_penalty": 3,
+          "order": 0
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 10,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 2: Printing Out the Server's Memory",
+      "level_type": "TRAINING_LEVEL",
+      "order": 4,
+      "estimated_duration": 20,
+      "minimal_possible_solve_time": null,
+      "answer": null,
+      "answer_variable_name": "flag_task2",
+      "content": "**2.A — Stack data.** The banner (on 9091) already gives you the input buffer's address directly — you don't need to brute-force it with a marker the way the SEED handout's generic walkthrough does. What you still need to find is the **offset**: how many `%x` (or which `%N$x`) specifiers it takes before the output matches the address you were just given, confirming that position on the argument pointer corresponds to the very start of your own input.\n\n**2.B — Heap data.** Using that offset with `%N$s` instead of `%N$x`, and the secret message's address (also in the banner) placed little-endian at the start of your payload, leak its contents.\n\nSee SEED Labs handout, section 4.\n\nThe flag is the secret string revealed in 2.B.",
+      "solution": "See SEED Labs handout, section 4.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Finding your offset (2.A)",
+          "content": "Send a unique marker followed by several %N$x and look for which N echoes it back — or echoes the buffer address from the banner.",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "Byte order (2.B)",
+          "content": "x86-64 is little-endian when packing an address into your payload.",
+          "hint_penalty": 5,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 25,
+      "variant_answers": true,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 3: Modifying the Server's Memory",
+      "level_type": "TRAINING_LEVEL",
+      "order": 5,
+      "estimated_duration": 20,
+      "minimal_possible_solve_time": null,
+      "answer": "The target variable's value (after):  0x0000000000005000",
+      "answer_variable_name": null,
+      "content": "Use `%n` with the offset from Task 2 to write to a chosen address instead of reading from it — target the `target` variable, whose address is also in the banner.\n\n**3.A** — change `target` to any different value, to confirm the write works at all.\n**3.B** — change it to exactly `0x5000`.\n**3.C** — for a larger target value (e.g. `0xAABBCCDD`), use `%hn` or `%hhn` instead of a plain `%n`, so you don't need printf to emit billions of padding characters first.\n\nSee SEED Labs handout, section 5.\n\nThe flag is the line the server prints once `target` reads back as exactly `0x5000` (3.B) — the program always prints it zero-padded to 16 hex digits.",
+      "solution": "See SEED Labs handout, section 5.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Controlling the byte count (3.B)",
+          "content": "A width-padded conversion like %050d lets you set printf's running output-byte-count before the %n.",
+          "hint_penalty": 5,
+          "order": 0
+        },
+        {
+          "title": "Four/eight bytes is a lot (3.C)",
+          "content": "%hn / %hhn write 2 / 1 bytes at a time, reaching a large target without huge padding.",
+          "hint_penalty": 5,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 25,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 4: Inject Malicious Code",
+      "level_type": "TRAINING_LEVEL",
+      "order": 6,
+      "estimated_duration": 30,
+      "minimal_possible_solve_time": null,
+      "answer": null,
+      "answer_variable_name": "flag_task3",
+      "content": "Combine the read and write primitives from Tasks 2-3 to overwrite a saved return address with the address of shellcode placed inside your own input (the stack is executable). See SEED Labs handout, section 6, and section 9 for turning it into a reverse shell.\n\nObjective: achieve code execution as the `formatsvc` account and read `flag_task3.txt` from its home directory.\n\nThis exercise does not ship a ready-made exploit payload or shellcode — build and test one against a provisioned sandbox using the offsets you found in Tasks 2-3.",
+      "solution": "See SEED Labs handout, sections 6 and 9.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Where does the shellcode go?",
+          "content": "Anywhere in your own input, at a known offset you can compute an address for.",
+          "hint_penalty": 6,
+          "order": 0
+        },
+        {
+          "title": "What do you overwrite?",
+          "content": "The saved return address of the function printf() is running inside.",
+          "hint_penalty": 7,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 35,
+      "variant_answers": true,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 5: Attacking the 64-bit Server",
+      "level_type": "TRAINING_LEVEL",
+      "order": 7,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": null,
+      "answer": "2",
+      "answer_variable_name": null,
+      "content": "This sandbox's target is already a 64-bit binary, so you solved this task's core problem while building Task 4: on x86-64 Linux, user-space addresses never use their top two bytes, which means every address you place in your payload contains at least two `0x00` bytes. Since `printf()` stops reading its format string at the first `\\0`, you cannot simply paste such an address into the middle of your payload and keep going — anything after that zero byte is ignored.\n\nExplain, in your own words, which part of your Task 4 payload could not simply contain a raw address followed by more format-string text, and how the `%N$` positional-parameter syntax (used throughout Tasks 2-4) sidesteps the problem by letting you place every address at the very start of the buffer instead.\n\nThe flag is: how many of the 8 bytes in a typical x86-64 user-space address are always `0x00`?",
+      "solution": "Two. Addresses above 0x00007FFFFFFFFFFF are not valid user-space addresses on x86-64 Linux, so the top two bytes of every address you leak or construct are always zero — which is exactly why every address in this exercise's payloads has to sit at the very start of the buffer (via %N$ positional parameters), never in the middle followed by more text.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Where do the zero bytes come from?",
+          "content": "x86-64 Linux user-space addresses top out around 0x00007FFFFFFFFFFF.",
+          "hint_penalty": 3,
+          "order": 0
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 10,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 6: Fixing the Problem",
+      "level_type": "TRAINING_LEVEL",
+      "order": 8,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": null,
+      "answer": "-Wformat-security",
+      "answer_variable_name": null,
+      "content": "`gcc` warns about the vulnerable `printf(msg)` call at compile time by default. Build `format.c` and read the warning.\n\nFix the vulnerability (pass the user's input as a `%s` argument instead of as the format string itself), recompile, and confirm your Task 1 payload no longer crashes the program.\n\nThe flag is the name of the compiler warning flag gcc reports for this specific mistake (format: `-W...`).",
+      "solution": "`-Wformat-security`. The fix is to change `printf(msg)` to `printf(\"%s\", msg)` — after that, every `%` character in the input is just a literal character again, and the warning disappears on rebuild.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Where's the warning?",
+          "content": "It appears during compilation, pointing at the printf(msg) line.",
+          "hint_penalty": 2,
+          "order": 0
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 10,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    }
+  ],
+  "estimated_duration": 105,
+  "variant_sandboxes": false
+}

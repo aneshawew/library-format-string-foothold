@@ -1,0 +1,14 @@
+# APG variables: one fresh set of values is generated per sandbox instance
+# by the Answers Storage service at allocation time.
+# https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/apg-variables/
+
+buf_size:
+    type: port
+    min: 16
+    max: 256
+
+flag_task2:
+    type: text
+
+flag_task3:
+    type: text

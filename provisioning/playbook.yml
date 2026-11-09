@@ -1,0 +1,20 @@
+---
+- name: Configure attacker
+  hosts: attacker
+  become: true
+  roles:
+    - role: user-access
+      user_access_username: user
+      user_access_password: Password123
+      user_access_sudo: True
+    - role: chrony
+    - role: attacker
+
+- name: Configure server
+  hosts: server
+  become: true
+  roles:
+    - role: chrony
+    - role: server
+  # No user-access role here - students never log into this host; the
+  # exercise is a remote exploit over the network, same as the PDF.

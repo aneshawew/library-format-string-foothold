@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+[Unit]
+Description=SEED Labs format-string vulnerable TCP server
+After=network.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+WorkingDirectory=/opt/format
+ExecStart=/opt/format/server
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

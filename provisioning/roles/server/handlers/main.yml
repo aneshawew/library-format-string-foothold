@@ -1,0 +1,5 @@
+---
+- name: Restart format service
+  service:
+    name: format
+    state: restarted

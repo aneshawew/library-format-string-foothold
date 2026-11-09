@@ -1,0 +1,99 @@
+---
+- name: apt update
+  apt:
+    update_cache: yes
+
+- name: Install lab toolchain
+  apt:
+    name: "{{ packages }}"
+    state: present
+
+- name: Disable ASLR for this host
+  sysctl:
+    name: kernel.randomize_va_space
+    value: "0"
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: Create service account
+  user:
+    name: "{{ service_user }}"
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: yes
+
+- name: Create application directory
+  file:
+    path: /opt/format
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0755"
+
+- name: Render format.c for this sandbox instance (BUF_SIZE, secret per variables.yml)
+  template:
+    src: format.c.j2
+    dest: /root/build_format.c
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Copy server.c (unmodified TCP wrapper, see ATTRIBUTION.txt)
+  copy:
+    src: server.c
+    dest: /root/build_server.c
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Compile the vulnerable target (stack protector off, exec stack on)
+  command: >
+    gcc -no-pie -fno-stack-protector -D_FORTIFY_SOURCE=0 -z execstack
+    -Wno-format-security -O0
+    -o /opt/format/format /root/build_format.c
+
+- name: Compile the TCP server wrapper
+  command: gcc -o /opt/format/server /root/build_server.c
+
+- name: Lock down the built binaries to the service account
+  file:
+    path: "{{ item }}"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0750"
+  loop:
+    - /opt/format/format
+    - /opt/format/server
+
+- name: Remove the rendered sources from /root
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /root/build_format.c
+    - /root/build_server.c
+
+- name: Write Task 4 flag (reachable only via code execution)
+  copy:
+    content: "{{ flag_task3 }}\n"
+    dest: "/home/{{ service_user }}/flag_task3.txt"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: "0600"
+
+- name: Install the systemd unit
+  template:
+    src: format.service.j2
+    dest: /etc/systemd/system/format.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart format service
+
+- name: Ensure the format service is enabled and running
+  systemd:
+    name: format
+    state: started
+    enabled: yes
+    daemon_reload: yes

@@ -3,15 +3,15 @@ name: format-string-foothold
 hosts:
   - name: attacker
     base_box:
-      image: kali
-      mgmt_user: debian
-    flavor: standard.small
+      image: seed
+      mgmt_user: ubuntu
+    flavor: m1.medium
 
   - name: server
     base_box:
-      image: debian-12-x86_64
-      mgmt_user: debian
-    flavor: standard.small
+      image: seed
+      mgmt_user: ubuntu
+    flavor: m1.medium
 
 routers:
   - name: router

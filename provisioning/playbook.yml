@@ -1,20 +1,14 @@
 ---
-- name: Configure attacker
-  hosts: attacker
+- name: Configure victim
+  hosts: victim
   become: true
   roles:
     - role: user-access
-      user_access_username: user
-      user_access_password: Password123
-      user_access_sudo: True
+      user_access_username: seed
+      user_access_password: dees
+      user_access_sudo: False
     - role: chrony
-    - role: attacker
-
-- name: Configure server
-  hosts: server
-  become: true
-  roles:
-    - role: chrony
-    - role: server
-  # No user-access role here - students never log into this host; the
-  # exercise is a remote exploit over the network, same as the PDF.
+    - role: victim
+  # Single-VM design, matching the PDF ("it is acceptable if students use
+  # one VM for this lab"): the student logs into this same host and
+  # attacks the root daemon running on it via 127.0.0.1:9090/udp.

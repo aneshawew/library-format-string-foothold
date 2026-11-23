@@ -2,13 +2,17 @@
 # by the Answers Storage service at allocation time.
 # https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/apg-variables/
 
-buf_size:
+# The lab's own instructor note suggests picking one DUMMY_SIZE value
+# (0-300) for the whole class, to stop students reusing last year's
+# solution. We go further and generate a fresh one per sandbox instead,
+# so no two students' offsets match either.
+dummy_size:
     type: port
-    min: 16
-    max: 256
+    min: 0
+    max: 300
 
-flag_task2:
+flag_task4:
     type: text
 
-flag_task3:
+flag_task7:
     type: text

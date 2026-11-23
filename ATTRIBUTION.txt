@@ -1,10 +1,33 @@
 Based on:
 
-SEED Labs - Format String Attack Lab
-Copyright (c) 2018-2020 Wenliang Du, All rights reserved.
-Free to use for non-commercial educational purposes.
+SEED Labs - Format String Vulnerability Lab (updated 2020-01-12)
+Copyright (c) 2018 Wenliang Du, All rights reserved.
+Free to use for non-commercial educational purposes. Commercial use prohibited.
 https://seedsecuritylabs.org / https://www.handsonsecurity.net
 
 This sandbox definition (topology, provisioning, training level structure, APG variable
 design) is an original adaptation for the CyberRangeCZ Platform and is not an official SEED
 Labs deliverable.
+
+provisioning/roles/victim/templates/server.c.j2 is reconstructed from Listing 1 of the lab
+handout PDF (no Labsetup.zip was provided for this lab variant, only the PDF text), under the
+license above. Four changes from the listing as printed:
+
+  1. DUMMY_SIZE is set per sandbox instance by the APG "dummy_size" variable, instead of one
+     instructor-chosen value shared by an entire class (see variables.yml / INSTRUCTOR_NOTES.md
+     for why this is a stronger anti-cheat property than the handout's own suggestion).
+  2. The secret message is this sandbox's "flag_task2" APG value instead of a string fixed for
+     every student.
+  3. The listing calls a helper() function in main() that is never defined in the printed
+     excerpt - stubbed out as a no-op so the file compiles.
+  4. Added #include <stdint.h> for uintptr_t, missing from the listing's own header list.
+  5. Added one line - printf("SERVER-READY\n") right after bind() succeeds - not in the
+     original, used only as a fixed, address-independent marker so Task 3's crash/restart is
+     observable without relying on any memory address. See INSTRUCTOR_NOTES.md.
+
+This sandbox is a single VM (topology.yml has one host, "victim"), per the handout's own note
+that running both ends on one machine is acceptable. The vulnerable daemon runs as root,
+matching the handout's "privileged root daemon" framing - see INSTRUCTOR_NOTES.md for why
+that's an acceptable tradeoff here specifically (single, per-student VM) when it wasn't for an
+earlier two-host variant of this project.
+

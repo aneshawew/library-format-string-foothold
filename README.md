@@ -38,8 +38,8 @@ note.
 
 APG (Automatic Problem Generation) — see `variables.yml`. Each sandbox gets its own
 `dummy_size` (shifts the stack layout - stronger than the handout's own suggestion of one
-value per class) and two random flag tokens (`flag_task2`, embedded as the `secret` string;
-`flag_task3`, dropped to `/root/flag_task3.txt`, reachable only via Task 6-7's code execution).
+value per class) and two random flag tokens (`flag_task4`, embedded as the `secret` string;
+`flag_task7`, dropped to `/root/flag_task7.txt`, reachable only via Task 6-7's code execution).
 
 ## Status
 
@@ -52,8 +52,3 @@ testing surfaced: the daemon never exits, so its stdout needs to be run unbuffer
 (`stdbuf -o0`, already wired into the systemd unit) or `journalctl` won't show anything for a
 long time.
 
-**Not included:** a working Task 6-7 exploit (shellcode + offsets for this specific target).
-`exploit.py` / `build_string.py` are present in `provisioning/roles/victim/files/attack-code/`
-- they were carried over from this project's earlier TCP/64-bit version, where they came from
-that lab's own `Labsetup.zip`, and will need rework for this one (different protocol,
-architecture, and stack layout). See `INSTRUCTOR_NOTES.md`.

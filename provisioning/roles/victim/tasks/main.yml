@@ -58,9 +58,9 @@
 - name: Deploy attack-code/ to the student's home directory
   copy:
     src: attack-code/
-    dest: /home/user/attack-code/
-    owner: user
-    group: user
+    dest: /home/seed/attack-code/
+    owner: seed
+    group: seed
     mode: "0644"
   # src ends in "/" so Ansible copies the *contents* of
   # roles/victim/files/attack-code/, not the directory itself.
@@ -68,9 +68,9 @@
 - name: Put Lab Handout in student's home directory
   copy:
     src: lab.pdf
-    dest: /home/user/lab.pdf
-    owner: user
-    group: user
+    dest: /home/seed/lab.pdf
+    owner: seed
+    group: seed
     mode: "0644"
 
 - name: Install the systemd unit

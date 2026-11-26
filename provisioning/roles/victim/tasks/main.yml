@@ -1,90 +1,55 @@
 ---
-- name: apt update
-  apt:
-    update_cache: yes
-
-- name: Install lab toolchain (32-bit multilib, netcat, pwntools deps)
-  apt:
-    name: "{{ packages }}"
-    state: present
-
-- name: Install pwntools
-  pip:
-    name: pwntools
-    executable: pip3
-
-- name: Disable ASLR for this host
-  sysctl:
-    name: kernel.randomize_va_space
-    value: "0"
-    sysctl_set: yes
-    state: present
-    reload: yes
-
-- name: Create application directory
+- name: Create server-code/ in the student's home directory
   file:
-    path: /opt/format
+    path: /home/seed/server-code
     state: directory
-    owner: root
-    group: root
+    owner: seed
+    group: seed
     mode: "0755"
 
-- name: Render server.c for this sandbox instance (DUMMY_SIZE, secret per variables.yml)
+- name: Drop this sandbox's Makefile (APG buf_size)
+  template:
+    src: Makefile.j2
+    dest: /home/seed/server-code/Makefile
+    owner: seed
+    group: seed
+    mode: "0644"
+
+- name: Drop this sandbox's server.c
   template:
     src: server.c.j2
-    dest: /root/build_server.c
-    owner: root
-    group: root
-    mode: "0600"
-
-- name: Compile the vulnerable target (32-bit, executable stack)
-  command: >
-    gcc -m32 -z execstack -Wno-format-security -O0
-    -o /opt/format/server /root/build_server.c
-
-- name: Remove the rendered source from /root
-  file:
-    path: /root/build_server.c
-    state: absent
-
-- name: Write Task 6/7 flag (reachable only via code execution as root)
-  copy:
-    content: "{{ flag_task7 }}\n"
-    dest: /root/flag_task7.txt
-    owner: root
-    group: root
-    mode: "0600"
-
-- name: Deploy attack-code/ to the student's home directory
-  copy:
-    src: attack-code/
-    dest: /home/seed/attack-code/
-    owner: seed
-    group: seed
-    mode: "0644"
-  # src ends in "/" so Ansible copies the *contents* of
-  # roles/victim/files/attack-code/, not the directory itself.
-
-- name: Put Lab Handout in student's home directory
-  copy:
-    src: lab.pdf
-    dest: /home/seed/lab.pdf
+    dest: /home/seed/server-code/server.c
     owner: seed
     group: seed
     mode: "0644"
 
-- name: Install the systemd unit
+- name: Drop this sandbox's format.c (APG flag_task4 secret)
   template:
-    src: server.service.j2
-    dest: /etc/systemd/system/server.service
+    src: format.c.j2
+    dest: /home/seed/server-code/format.c
+    owner: seed
+    group: seed
+    mode: "0644"
+
+- name: Write the reverse-shell flag, readable only once code runs as root
+  copy:
+    content: "{{ flag_reverse_shell }}\n"
+    dest: /root/flag_reverse_shell.txt
     owner: root
     group: root
-    mode: "0644"
-  notify: Restart server
+    mode: "0600"
 
-- name: Ensure the server service is enabled and running
-  systemd:
-    name: server
-    state: started
-    enabled: yes
-    daemon_reload: yes
+- name: Let the student start the (not-yet-built) server binaries as root, nothing else
+  copy:
+    content: |
+      seed ALL=(root) NOPASSWD: /home/seed/server-code/server32, /home/seed/server-code/server64
+    dest: /etc/sudoers.d/seed-server-code
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+  # This is the handout's own "runs with root privilege" premise (Section
+  # 2.2), scoped to exactly these two binaries so the student can start
+  # the daemon themselves without a standing root shell that would make
+  # /root/flag_reverse_shell.txt readable by just asking sudo for it.
+

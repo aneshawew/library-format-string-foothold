@@ -2,17 +2,21 @@
 # by the Answers Storage service at allocation time.
 # https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/apg-variables/
 
-# The lab's own instructor note suggests picking one DUMMY_SIZE value
-# (0-300) for the whole class, to stop students reusing last year's
-# solution. We go further and generate a fresh one per sandbox instead,
-# so no two students' offsets match either.
-dummy_size:
+# BUF_SIZE / "L" in the Makefile - the handout's own instructor knob
+# ("Suggested value: between 10 and 400" - format.c). No native
+# "integer in range" APG type, so, as elsewhere in this library, the
+# "port" type is reused purely for its integer-range generator; the
+# value is never used as a network port.
+buf_size:
     type: port
-    min: 0
-    max: 300
+    min: 10
+    max: 400
 
+# Task 2.B: the heap "secret" string in format.c.
 flag_task4:
     type: text
 
-flag_task7:
+# Task 4: dropped into /root/flag_reverse_shell.txt on the victim,
+# reachable only once the student has a root shell on that machine.
+flag_reverse_shell:
     type: text

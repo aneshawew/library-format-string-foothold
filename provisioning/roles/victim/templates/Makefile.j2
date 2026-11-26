@@ -1,0 +1,27 @@
+FLAGS    = -z execstack 
+FLAGS_32 = -static -m32
+TARGET   = server32 server64 format-32 format-64
+
+# BUF_SIZE: set for this sandbox instance by the training platform's APG
+# "buf_size" variable - same role as the handout's own instructor knob.
+L = {{ buf_size }}
+
+all: $(TARGET)
+
+# Two instances of the same server.c (PROGRAM/PORT are the only things
+# that differ - see server.c): server32 execs format-32 on the default
+# port 9090, server64 execs format-64 on port 9092.
+server32: server.c
+	gcc -DPROGRAM='"format-32"' -o $@ server.c
+
+server64: server.c
+	gcc -DPROGRAM='"format-64"' -DPORT=9092 -o $@ server.c
+
+format-32: format.c
+	gcc -DBUF_SIZE=$(L) $(FLAGS) $(FLAGS_32) -o $@ format.c
+
+format-64: format.c
+	gcc -DBUF_SIZE=$(L) $(FLAGS) -o $@ format.c
+
+clean:
+	rm -f badfile $(TARGET)

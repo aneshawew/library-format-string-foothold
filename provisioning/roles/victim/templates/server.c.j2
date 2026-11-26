@@ -1,99 +1,146 @@
-/* server.c
- *
- * Reconstructed from Listing 1 of the "Format String Vulnerability Lab"
- * PDF (SEED Labs, Copyright (c) 2018 Wenliang Du, updated 2020-01-12).
- * Licensed for free non-commercial educational use. See ATTRIBUTION.txt.
- *
- * Two changes from the listing as printed in the PDF:
- *   1. DUMMY_SIZE is set per sandbox instance by the APG "dummy_size"
- *      variable, instead of a single instructor-chosen -D flag shared by
- *      a whole class.
- *   2. The secret message is this sandbox's "flag_task4" APG value
- *      instead of a string fixed for every student.
- *   3. The PDF's listing calls a helper() function in main() that is
- *      never defined in the printed excerpt - it's stubbed out here as a
- *      no-op so the file compiles.
- *   4. Added #include <stdint.h> for uintptr_t, missing from the
- *      listing's own header list - it compiled without it on whatever
- *      system the PDF's screenshots were taken on, but not here.
- * See ATTRIBUTION.txt.
- */
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <arpa/inet.h>
+#include <signal.h>
+#include <sys/wait.h>
 
-#define PORT 9090
-
-#ifndef DUMMY_SIZE
-#define DUMMY_SIZE {{ dummy_size }}
+#ifndef PROGRAM
+#define PROGRAM "format"
 #endif
+#ifndef PORT
+#define PORT    9090
+#endif
+/* The two #ifndef blocks above are the only change from the handout's
+ * server.c: PROGRAM and PORT were hardcoded #defines. Making them
+ * overridable via -D lets the Makefile build two instances of this same
+ * file, server32 (PROGRAM="format-32", default PORT 9090) and server64
+ * (PROGRAM="format-64", PORT 9092), with identical behavior otherwise. */
 
-char *secret = "{{ flag_task4 }}\n";
-unsigned int target = 0x11223344;
-
-void helper(void)
-{
-    // Not defined in the lab handout's printed listing - stubbed out
-    // here so the file compiles. See ATTRIBUTION.txt.
-}
-
-void myprintf(char *msg)
-{
-    uintptr_t framep;
-    // Copy the ebp value into framep, and print it out
-    asm("movl %%ebp, %0" : "=r"(framep));
-    printf("The ebp value inside myprintf() is: 0x%.8x\n", (unsigned) framep);
-
-    // Need to use the array at least once
-    char dummy[DUMMY_SIZE];
-    memset(dummy, 0, DUMMY_SIZE);
-
-    // This line has a format string vulnerability
-    printf(msg);
-
-    printf("The value of the 'target' variable (after): 0x%.8x\n", target);
-}
+int socket_bind(int port);
+int server_accept(int listen_fd, struct sockaddr_in *client);
+char **generate_random_env();
 
 void main()
 {
+    int listen_fd;
+    struct sockaddr_in  client;
+
+    // Generate a random number
+    srand (time(NULL));
+    int random_n = rand()%2000; 
+   
+    // handle signal from child processes
+    signal(SIGCHLD, SIG_IGN);
+
+    listen_fd = socket_bind(PORT);
+    while (1){
+	int socket_fd = server_accept(listen_fd, &client);
+
+        if (socket_fd < 0) {
+	    perror("Accept failed");
+            exit(EXIT_FAILURE);
+        }
+
+	int pid = fork();
+        if (pid == 0) {
+            // Redirect STDIN to this connection, so it can take input from user
+            dup2(socket_fd, STDIN_FILENO);
+
+	    // Uncomment the following if we want to send the output back to user.
+	    //This is useful for remote attacks. 
+            int output_fd = socket(AF_INET, SOCK_STREAM, 0);
+            client.sin_port = htons(9091);
+	    if (!connect(output_fd, (struct sockaddr *)&client, sizeof(struct sockaddr_in))){
+               // If the connection is made, redirect the STDOUT to this connection
+               dup2(output_fd, STDOUT_FILENO);
+	    }
+	     
+
+	    // Invoke the program 
+	    fprintf(stderr, "Starting %s\n", PROGRAM);
+            //execl(PROGRAM, PROGRAM, (char *)NULL);
+	    // Using the following to pass an empty environment variable array
+            //execle(PROGRAM, PROGRAM, (char *)NULL, NULL);
+	    
+	    // Using the following to pass a randomly generated environment varraible array.
+	    // This is useful to slight randomize the stack's starting point.
+            execle(PROGRAM, PROGRAM, (char *)NULL, generate_random_env(random_n));
+        }
+        else {
+            close(socket_fd);
+	}
+    } 
+
+    close(listen_fd);
+}
+
+
+int socket_bind(int port)
+{
+    int listen_fd;
+    int opt = 1;
     struct sockaddr_in server;
-    struct sockaddr_in client;
-    socklen_t clientLen = sizeof(client);
-    char buf[1500];
 
-    // Need to use the array at least once
-    char dummy[DUMMY_SIZE];
-    memset(dummy, 0, DUMMY_SIZE);
+    if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
 
-    printf("The address of the input array: 0x%.8x\n", (unsigned) buf);
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
+    {
+        perror("setsockopt failed");
+        exit(EXIT_FAILURE);
+    }
 
-    helper();
-
-    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     memset((char *) &server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
-    server.sin_port = htons(PORT);
+    server.sin_port = htons(port);
 
-    if (bind(sock, (struct sockaddr *) &server, sizeof(server)) < 0)
-        perror("ERROR on binding");
-
-    // Not in the PDF's listing - a fixed, address-independent marker so
-    // a restart (this process never exits normally; a crash is the only
-    // way it restarts) is observable in the journal without relying on
-    // any address value. See ATTRIBUTION.txt and Task 3 in training.json.
-    printf("SERVER-READY\n");
-    fflush(stdout);
-
-    while (1) {
-        bzero(buf, 1500);
-        recvfrom(sock, buf, 1500 - 1, 0,
-                 (struct sockaddr *) &client, &clientLen);
-        myprintf(buf);
+    if (bind(listen_fd, (struct sockaddr *) &server, sizeof(server)) < 0)
+    {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
     }
-    close(sock);
+
+    if (listen(listen_fd, 3) < 0)
+    {
+        perror("listen failed");
+        exit(EXIT_FAILURE);
+    }
+
+    return listen_fd;
+}
+
+int server_accept(int listen_fd, struct sockaddr_in *client)
+{
+    int c = sizeof(struct sockaddr_in);
+
+    int socket_fd = accept(listen_fd, (struct sockaddr *)client, (socklen_t *)&c);
+    char *ipAddr = inet_ntoa(client->sin_addr);
+    printf("Got a connection from %s\n", ipAddr);
+    return socket_fd;
+}
+
+// Generate environment variables. The length of the environment affects 
+// the stack location. This is used to add some randomness to the lab.
+char **generate_random_env(int length)
+{
+    const char *name = "randomstring=";
+    char **env;
+
+    env = malloc(2*sizeof(char *));
+
+    env[0] = (char *) malloc((length + strlen(name))*sizeof(char));
+    strcpy(env[0], name);
+    memset(env[0] + strlen(name), 'A', length -1);
+    env[0][length + strlen(name) - 1] = 0;
+    env[1] = 0;
+    return env;
 }

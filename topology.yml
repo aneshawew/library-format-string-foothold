@@ -1,6 +1,12 @@
-name: format-string-foothold
+name: format-string-attack-lab
 
 hosts:
+  - name: attacker
+    base_box:
+      image: seed
+      mgmt_user: ubuntu
+    flavor: m1.medium
+
   - name: victim
     base_box:
       image: seed
@@ -23,9 +29,13 @@ networks:
     cidr: 10.1.26.0/24
 
 net_mappings:
-  - host: victim
+  - host: attacker
     network: lab-switch
     ip: 10.1.26.10
+
+  - host: victim
+    network: lab-switch
+    ip: 10.1.26.20
 
 router_mappings:
   - router: router

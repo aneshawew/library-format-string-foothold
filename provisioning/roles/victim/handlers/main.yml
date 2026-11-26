@@ -1,5 +1,0 @@
----
-- name: Restart server
-  service:
-    name: server
-    state: restarted

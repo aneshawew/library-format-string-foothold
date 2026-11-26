@@ -1,0 +1,10 @@
+---
+- name: Deploy attack-code/ to the student's home directory
+  copy:
+    src: attack-code/
+    dest: /home/seed/attack-code/
+    owner: seed
+    group: seed
+    mode: "0644"
+  # src ends in "/" so Ansible copies the *contents* of
+  # roles/attacker/files/attack-code/, not the directory itself.
